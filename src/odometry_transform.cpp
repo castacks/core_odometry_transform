@@ -13,6 +13,7 @@ bool OdometryTransform::initialize(){
   
   // init parameters
   convert_odometry_to_transform = pnh->param("convert_odometry_to_transform", false);
+  convert_odometry_to_stabilized_transform = pnh->param("convert_odometry_to_stabilized_transform", false);
   transform_odometry_to_new_frame = pnh->param("transform_odometry_to_new_frame", false);
   transform_name = pnh->param("transform_name", std::string());
   new_frame_id = pnh->param("new_frame_id", std::string());
@@ -36,12 +37,23 @@ bool OdometryTransform::execute(){
 
 void OdometryTransform::odometry_callback(nav_msgs::Odometry odom){
   try{
-    tf::Transform odom_tf(tflib::to_tf(odom.pose.pose.orientation), tflib::to_tf(odom.pose.pose.position));
-    tf::StampedTransform odom_stamped_tf(odom_tf, odom.header.stamp, odom.header.frame_id, transform_name);
-    broadcaster->sendTransform(odom_stamped_tf);
+    if(convert_odometry_to_transform){
+      tf::Transform odom_tf(tflib::to_tf(odom.pose.pose.orientation), tflib::to_tf(odom.pose.pose.position));
+      tf::StampedTransform odom_stamped_tf(odom_tf, odom.header.stamp, odom.header.frame_id, transform_name);
+      broadcaster->sendTransform(odom_stamped_tf);
+    }
+
+    if(convert_odometry_to_stabilized_transform){
+      tf::Transform odom_tf(tflib::to_tf(odom.pose.pose.orientation), tflib::to_tf(odom.pose.pose.position));
+      tf::Transform stabilized_tf = tflib::get_stabilized(odom_tf);
+      tf::StampedTransform odom_stamped_tf(stabilized_tf, odom.header.stamp, odom.header.frame_id, transform_name+"_stabilized");
+      broadcaster->sendTransform(odom_stamped_tf);
+    }
     
-    nav_msgs::Odometry out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
-    odometry_pub.publish(out_odom);
+    if(transform_odometry_to_new_frame){
+      nav_msgs::Odometry out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
+      odometry_pub.publish(out_odom);
+    }
   }
   catch(tf::TransformException& ex){
     ROS_ERROR_STREAM("TransformException while transforming odometry: " << ex.what());
