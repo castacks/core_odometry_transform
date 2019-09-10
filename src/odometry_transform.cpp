@@ -14,7 +14,6 @@ bool OdometryTransform::initialize(){
   // init parameters
   convert_odometry_to_transform = pnh->param("convert_odometry_to_transform", false);
   convert_odometry_to_stabilized_transform = pnh->param("convert_odometry_to_stabilized_transform", false);
-  transform_odometry_to_new_frame = pnh->param("transform_odometry_to_new_frame", false);
   odometry_output_type = static_cast<OdometryOutputType>(pnh->param("odometry_output_type", (int)NONE));
   restamp_now = pnh->param("restamp_now", false);
   transform_name = pnh->param("transform_name", std::string());
@@ -57,11 +56,9 @@ void OdometryTransform::odometry_callback(nav_msgs::Odometry odom){
 
   if(odometry_output_type == TRANSFORMED){
     try{
-      if(transform_odometry_to_new_frame){
-	nav_msgs::Odometry out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
-	out_odom.header.stamp = stamp;
-	odometry_pub.publish(out_odom);
-      }
+      nav_msgs::Odometry out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
+      out_odom.header.stamp = stamp;
+      odometry_pub.publish(out_odom);
     }
     catch(tf::TransformException& ex){
       ROS_ERROR_STREAM("TransformException while transforming odometry: " << ex.what());

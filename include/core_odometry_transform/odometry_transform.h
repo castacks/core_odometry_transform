@@ -14,7 +14,6 @@ private:
   // parameters
   bool convert_odometry_to_transform,
     convert_odometry_to_stabilized_transform,
-    transform_odometry_to_new_frame,
     restamp_now;
   OdometryOutputType odometry_output_type;
   std::string transform_name, new_frame_id, new_child_frame_id;
