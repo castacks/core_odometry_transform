@@ -17,6 +17,12 @@ private:
     restamp_now;
   OdometryOutputType odometry_output_type;
   std::string transform_name, new_frame_id, new_child_frame_id;
+  bool rotate_orientation;
+  double rotate_orientation_x;
+  double rotate_orientation_y;
+  double rotate_orientation_z;
+  double rotate_orientation_w;
+  tf::Transform rotate_orientation_tf;
 
   // subscribers
   ros::Subscriber odometry_sub;
