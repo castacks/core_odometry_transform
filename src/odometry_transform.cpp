@@ -19,6 +19,11 @@ bool OdometryTransform::initialize(){
   transform_name = pnh->param("transform_name", std::string());
   new_frame_id = pnh->param("new_frame_id", std::string());
   new_child_frame_id = pnh->param("new_child_frame_id", std::string());
+  rotate_orientation = pnh->param("rotate_orientation", false);
+  rotate_orientation_tf = tf::Transform(tf::Quaternion(pnh->param("rotate_orientation_x", 0.0),
+						       pnh->param("rotate_orientation_y", 0.0),
+						       pnh->param("rotate_orientation_z", 0.0),
+						       pnh->param("rotate_orientation_w", 1.0)));
   
   // init subscribers
   odometry_sub = nh->subscribe("input_odometry", 10, &OdometryTransform::odometry_callback, this);
@@ -40,15 +45,24 @@ void OdometryTransform::odometry_callback(nav_msgs::Odometry odom){
   ros::Time stamp = odom.header.stamp;
   if(restamp_now)
     stamp = ros::Time::now();
+
+  tf::Quaternion orientation_q = tflib::to_tf(odom.pose.pose.orientation);
+  if(rotate_orientation){
+    orientation_q = tf::Transform(orientation_q)*rotate_orientation_tf.getRotation();
+    odom.pose.pose.orientation.x = orientation_q.x();
+    odom.pose.pose.orientation.y = orientation_q.y();
+    odom.pose.pose.orientation.z = orientation_q.z();
+    odom.pose.pose.orientation.w = orientation_q.w();
+  }
     
   if(convert_odometry_to_transform){
-    tf::Transform odom_tf(tflib::to_tf(odom.pose.pose.orientation), tflib::to_tf(odom.pose.pose.position));
+    tf::Transform odom_tf(orientation_q, tflib::to_tf(odom.pose.pose.position));
     tf::StampedTransform odom_stamped_tf(odom_tf, stamp, odom.header.frame_id, transform_name);
     broadcaster->sendTransform(odom_stamped_tf);
   }
 
   if(convert_odometry_to_stabilized_transform){
-    tf::Transform odom_tf(tflib::to_tf(odom.pose.pose.orientation), tflib::to_tf(odom.pose.pose.position));
+    tf::Transform odom_tf(orientation_q, tflib::to_tf(odom.pose.pose.position));
     tf::Transform stabilized_tf = tflib::get_stabilized(odom_tf);
     tf::StampedTransform odom_stamped_tf(stabilized_tf, stamp, odom.header.frame_id, transform_name+"_stabilized");
     broadcaster->sendTransform(odom_stamped_tf);
