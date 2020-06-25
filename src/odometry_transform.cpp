@@ -17,6 +17,7 @@ bool OdometryTransform::initialize(){
   odometry_output_type = static_cast<OdometryOutputType>(pnh->param("odometry_output_type", (int)NONE));
   restamp_now = pnh->param("restamp_now", false);
   transform_name = pnh->param("transform_name", std::string());
+  transform_name_stabilized = transform_name+"_stabilized";
   new_frame_id = pnh->param("new_frame_id", std::string());
   new_child_frame_id = pnh->param("new_child_frame_id", std::string());
   rotate_orientation = pnh->param("rotate_orientation", false);
@@ -24,13 +25,18 @@ bool OdometryTransform::initialize(){
 						       pnh->param("rotate_orientation_y", 0.0),
 						       pnh->param("rotate_orientation_z", 0.0),
 						       pnh->param("rotate_orientation_w", 1.0)));
+
+  new_frame_is_transform = new_frame_id == transform_name; // TODO use this
+  new_frame_is_transform_stabilized = new_frame_id == transform_name_stabilized; // TODO use this
+  new_child_frame_is_transform = new_child_frame_id == transform_name; // TODO use this
+  new_child_frame_is_transform_stabilized = new_child_frame_id == transform_name_stabilized; // this one is implemented
   
   // init subscribers
-  odometry_sub = nh->subscribe("input_odometry", 10, &OdometryTransform::odometry_callback, this);
+  odometry_sub = nh->subscribe("input_odometry", 1, &OdometryTransform::odometry_callback, this, ros::TransportHints().tcpNoDelay());
   listener = new tf::TransformListener();
   
   // init publishers
-  odometry_pub = nh->advertise<nav_msgs::Odometry>("odometry", 10);
+  odometry_pub = nh->advertise<nav_msgs::Odometry>("odometry", 1);
   broadcaster = new tf::TransformBroadcaster();
   
   return true;
@@ -54,23 +60,38 @@ void OdometryTransform::odometry_callback(nav_msgs::Odometry odom){
     odom.pose.pose.orientation.z = orientation_q.z();
     odom.pose.pose.orientation.w = orientation_q.w();
   }
-    
+
+  tf::Transform odom_tf;
   if(convert_odometry_to_transform){
-    tf::Transform odom_tf(orientation_q, tflib::to_tf(odom.pose.pose.position));
+    odom_tf = tf::Transform(orientation_q, tflib::to_tf(odom.pose.pose.position));
     tf::StampedTransform odom_stamped_tf(odom_tf, stamp, odom.header.frame_id, transform_name);
     broadcaster->sendTransform(odom_stamped_tf);
   }
 
+  tf::Transform stabilized_tf;
   if(convert_odometry_to_stabilized_transform){
-    tf::Transform odom_tf(orientation_q, tflib::to_tf(odom.pose.pose.position));
-    tf::Transform stabilized_tf = tflib::get_stabilized(odom_tf);
-    tf::StampedTransform odom_stamped_tf(stabilized_tf, stamp, odom.header.frame_id, transform_name+"_stabilized");
+    stabilized_tf = tflib::get_stabilized(odom_tf);
+    tf::StampedTransform odom_stamped_tf(stabilized_tf, stamp, odom.header.frame_id, transform_name_stabilized);
     broadcaster->sendTransform(odom_stamped_tf);
   }
 
   if(odometry_output_type == TRANSFORMED){
     try{
-      nav_msgs::Odometry out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
+      nav_msgs::Odometry out_odom;
+      if(!new_child_frame_is_transform_stabilized)
+	out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_child_frame_id, ros::Duration(0.1));
+      else{
+	out_odom = tflib::transform_odometry(listener, odom, new_frame_id, new_frame_id, ros::Duration(0.1));
+
+	tf::Transform stabilized_tf_no_translation = stabilized_tf;
+	stabilized_tf_no_translation.setOrigin(tf::Vector3(0, 0, 0));
+	tf::Vector3 vel = stabilized_tf_no_translation*tflib::to_tf(out_odom.twist.twist.linear);
+	out_odom.twist.twist.linear.x = vel.x();
+	out_odom.twist.twist.linear.y = vel.y();
+	out_odom.twist.twist.linear.z = vel.z();
+      }
+      
+      
       out_odom.header.stamp = stamp;
       odometry_pub.publish(out_odom);
     }
