@@ -16,17 +16,13 @@ private:
     convert_odometry_to_stabilized_transform,
     restamp_now;
   OdometryOutputType odometry_output_type;
-  std::string transform_name, transform_name_stabilized, new_frame_id, new_child_frame_id;
+  std::string transform_name, new_frame_id, new_child_frame_id;
   bool rotate_orientation;
   double rotate_orientation_x;
   double rotate_orientation_y;
   double rotate_orientation_z;
   double rotate_orientation_w;
   tf::Transform rotate_orientation_tf;
-
-  // variables
-  bool new_frame_is_transform, new_frame_is_transform_stabilized,
-    new_child_frame_is_transform, new_child_frame_is_transform_stabilized;
 
   // subscribers
   ros::Subscriber odometry_sub;
