@@ -61,9 +61,8 @@ void OdometryTransform::odometry_callback(nav_msgs::Odometry odom){
     odom.pose.pose.orientation.w = orientation_q.w();
   }
 
-  tf::Transform odom_tf;
+  tf::Transform odom_tf = tf::Transform(orientation_q, tflib::to_tf(odom.pose.pose.position));
   if(convert_odometry_to_transform){
-    odom_tf = tf::Transform(orientation_q, tflib::to_tf(odom.pose.pose.position));
     tf::StampedTransform odom_stamped_tf(odom_tf, stamp, odom.header.frame_id, transform_name);
     broadcaster->sendTransform(odom_stamped_tf);
   }
